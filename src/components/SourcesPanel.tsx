@@ -85,7 +85,7 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
     }
     try {
       await navigator.clipboard.writeText(text);
-      toast({ title: "Копирано", description: "Линкът е копиран." });
+      toast({ title: "Копирано", description: "Съдържанието е копирано." });
     } catch {
       try {
         const ta = document.createElement("textarea");
@@ -96,7 +96,7 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
         ta.select();
         document.execCommand("copy");
         document.body.removeChild(ta);
-        toast({ title: "Копирано", description: "Линкът е копиран." });
+        toast({ title: "Копирано", description: "rules е копирано." });
       } catch (e) {
         toast({ title: "Грешка при копиране", variant: "destructive" });
       }
