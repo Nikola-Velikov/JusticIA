@@ -11,7 +11,7 @@ import { apiGet } from "@/lib/api";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 const Index = () => {
-  const [showSources, setShowSources] = useState(true);
+  const [showSources, setShowSources] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ name: string; email: string } | undefined>(undefined);
   const navigate = useNavigate();
