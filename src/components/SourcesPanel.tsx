@@ -1,15 +1,9 @@
-import { FileText, X, ChevronRight, ExternalLink, Copy } from "lucide-react";
+import { FileText, ChevronRight, ExternalLink, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
 interface Message {
@@ -39,8 +33,8 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
     matches: string[];
     timestamp: Date;
   } | null>(null);
+  const { toast } = useToast();
 
-  // Extract sources and split matches per source (first match -> first source, etc.)
   const sourcesData = messages
     .filter((msg) => msg.role === "assistant" && msg.metadata?.sources)
     .map((msg) => {
@@ -60,7 +54,7 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
       return { id: msg.id, sources: withMatches, timestamp: msg.timestamp };
     });
 
-  const hasAssistant = messages.some(m => m.role === 'assistant');
+  const hasAssistant = messages.some((m) => m.role === "assistant");
 
   const isUrl = (value: string) => {
     try {
@@ -84,39 +78,50 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
     setOpen(true);
   };
 
+  const copyToClipboard = async (text?: string) => {
+    if (!text) {
+      toast({ title: "Нищо за копиране", variant: "destructive" });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Копирано", description: "Линкът е копиран." });
+    } catch {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        toast({ title: "Копирано", description: "Линкът е копиран." });
+      } catch (e) {
+        toast({ title: "Грешка при копиране", variant: "destructive" });
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-background border-l border-border w-full min-w-0">
-      {/* Header */}
-      <div className="border-b border-border bg-gradient-to-r from-background to-muted/30 p-6 flex items-center justify-between w-full shadow-sm backdrop-blur-sm min-w-0">
+      <div className="border-b border-border bg-white p-6 flex items-center justify-start w-full shadow-sm min-w-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-md">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-md">
             <FileText className="h-4 w-4 text-white" />
           </div>
           <h3 className="text-lg font-semibold text-muted-foreground">Източници</h3>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-8 w-8 p-0"
-        >
-          <X className="h-4 w-4" />
-        </Button>
       </div>
 
-      {/* Sources List */}
       <ScrollArea className="flex-1 p-0 w-full min-w-0">
         <div className="space-y-4 p-4 w-full min-w-0">
           {sourcesData.map((data) => (
             <Card key={data.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">
-                  Намерени източници
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Свързани източници</CardTitle>
               </CardHeader>
-              
               <CardContent className="pt-0 space-y-3">
-                {/* Sources */}
                 {data.sources.map((source, idx) => (
                   <button
                     key={idx}
@@ -131,46 +136,17 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
                     <ChevronRight className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100" />
                   </button>
                 ))}
-
-                {/* Matches Accordion */}
-                {false && data.sources.some((s: any) => s.matches && s.matches.length > 0) && (
-                  <Accordion type="single" collapsible className="w-full">
-                    <AccordionItem value="matches" className="border-none">
-                      <AccordionTrigger className="text-sm font-medium hover:no-underline py-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-primary/10 text-primary">
-                            {data.matches.length} съвпадения
-                          </Badge>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="space-y-2 mt-2">
-                          {data.matches.map((match, idx) => (
-                            <div
-                              key={idx}
-                              className="p-3 bg-muted/30 rounded-lg border border-border"
-                            >
-                              <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
-                                {match}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
-                )}
               </CardContent>
             </Card>
           ))}
         </div>
-        
+
         {sourcesData.length === 0 && (
           hasAssistant ? (
             <div className="p-4">
               <Card className="border border-border">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Намерени източници</CardTitle>
+                  <CardTitle className="text-sm font-medium">Свързани източници</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-md text-sm text-muted-foreground">
@@ -184,13 +160,12 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
             <div className="text-center py-8">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h4 className="text-sm font-medium text-foreground mb-2">Все още няма източници</h4>
-              <p className="text-sm text-muted-foreground">Източниците ще се показват тук докато разговаряте.</p>
+              <p className="text-sm text-muted-foreground">Задайте въпрос, за да видите източници.</p>
             </div>
           )
         )}
       </ScrollArea>
 
-      {/* Details Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="w-[min(92vw,48rem)] max-w-3xl max-h-[80vh] bg-card border border-border shadow-2xl sm:rounded-xl grid-rows-[auto,1fr,auto]">
           <DialogHeader>
@@ -199,14 +174,14 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
               {selected?.title || "Детайли за източника"}
             </DialogTitle>
             <DialogDescription>
-              {selected?.timestamp ? new Date(selected.timestamp).toLocaleString('bg-BG') : null}
+              {selected?.timestamp ? new Date(selected.timestamp).toLocaleString("bg-BG") : null}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 overflow-auto max-h-[60vh] pr-1">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-start gap-3">
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Източник</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Индекс</p>
                 <p className="text-sm text-foreground break-all">{selected?.index}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0 justify-end">
@@ -224,7 +199,7 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => { try { navigator.clipboard.writeText(selected.index); } catch {} }}
+                    onClick={() => copyToClipboard(selected?.index)}
                   >
                     <Copy className="h-4 w-4 mr-1" /> Копирай
                   </Button>
@@ -232,10 +207,9 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
               </div>
             </div>
 
-            {/* Related matches */}
             {selected && selected.matches && selected.matches.length > 0 && (
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Свързани съвпадения</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Свързани откъси</p>
                 <div className="space-y-2 max-h-64 overflow-auto pr-1">
                   {selected.matches.map((m, i) => (
                     <div key={i} className="p-3 bg-muted/40 rounded-lg border border-border">
@@ -255,3 +229,4 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
     </div>
   );
 }
+

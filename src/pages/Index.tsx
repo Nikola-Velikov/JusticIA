@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ChatSidebar } from "@/components/ChatSidebar";
@@ -8,12 +8,14 @@ import { SourcesPanel } from "@/components/SourcesPanel";
 import { Header } from "@/components/Header";
 import { useChat } from "@/hooks/useChat";
 import { apiGet } from "@/lib/api";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 const Index = () => {
   const [showSources, setShowSources] = useState(true);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ name: string; email: string } | undefined>(undefined);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const {
     chats,
@@ -51,25 +53,15 @@ const Index = () => {
       }
     })();
   }, [navigate]);
-  // If coming from guards/login, create a fresh chat but reuse existing empty chat if present
+  // Always create a single new chat when visiting /chat (guarded per navigation entry)
   useEffect(() => {
     if (loading) return;
-    try {
-      const wantsNew = sessionStorage.getItem('newChatOnNextVisit');
-      if (wantsNew) {
-        sessionStorage.removeItem('newChatOnNextVisit');
-        // Prefer existing empty chat if we have recorded one
-        try {
-          const emptyId = localStorage.getItem('emptyChatId');
-          if (emptyId && chats.some(c => c.id === emptyId)) {
-            selectChat(emptyId);
-            return;
-          }
-        } catch {}
-        createNewChat();
-      }
-    } catch {}
-  }, [loading, chats, selectChat, createNewChat]);
+    const visitKey = `createdFor:${location.key}`;
+    if (!sessionStorage.getItem(visitKey)) {
+      sessionStorage.setItem(visitKey, '1');
+      (async () => { try { await createNewChat(true); } catch {} })();
+    }
+  }, [loading, createNewChat, location.key]);
 
 
   // Auto-select last opened chat (from localStorage) or the most recent one
@@ -149,7 +141,7 @@ const Index = () => {
 
           <div className="flex-1 min-h-0 transition-all duration-200 ease-linear peer-data-[state=collapsed]:ml-[3rem] peer-data-[state=expanded]:ml-[16rem] w-full min-w-0">
             <ResizablePanelGroup direction="horizontal" className="h-full w-full min-w-0">
-              <ResizablePanel defaultSize={showSources ? 70 : 100} minSize={30}>
+              <ResizablePanel defaultSize={100} minSize={30}>
                 <ChatArea 
                   messages={messages}
                   isLoading={isLoading}
@@ -161,19 +153,14 @@ const Index = () => {
                   onEditingChange={setEditingState}
                 />
               </ResizablePanel>
-
-              {showSources && (
-                <>
-                  <ResizableHandle />
-                  <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
-                    <SourcesPanel 
-                      onClose={() => setShowSources(false)}
-                      messages={messages}
-                    />
-                  </ResizablePanel>
-                </>
-              )}
             </ResizablePanelGroup>
+
+            {/* Sources slide-over like chat history */}
+            <Sheet open={showSources} onOpenChange={setShowSources}>
+              <SheetContent side="right" className="w-[90vw] sm:max-w-lg bg-white p-0">
+                <SourcesPanel onClose={() => setShowSources(false)} messages={messages} />
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>

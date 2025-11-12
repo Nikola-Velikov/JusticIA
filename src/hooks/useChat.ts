@@ -45,9 +45,9 @@ export function useChat() {
     );
   }, []);
 
-  const createNewChat = useCallback(async () => {
-    // Reuse current empty chat if present
-    if (currentChatId && messages.length === 0) {
+  const createNewChat = useCallback(async (forceNew: boolean = false) => {
+    // Optionally reuse current empty chat unless forcing a new one
+    if (!forceNew && currentChatId && messages.length === 0) {
       try { localStorage.setItem('lastChatId', currentChatId); } catch {}
       try { localStorage.setItem('emptyChatId', currentChatId as string); } catch {}
       return currentChatId;
@@ -303,7 +303,7 @@ export function useChat() {
   }, [loadChats]);
 
   const isLoading = loadingChatId === currentChatId;
-  return { chats, messages, currentChatId, isLoading, sendMessage, stopSending, editLastMessage, deleteChat, selectChat, createNewChat };
+  return { chats, messages, currentChatId, isLoading, sendMessage, stopSending, editLastMessage, deleteChat, selectChat, createNewChat, discardMessage };
 }
 
 
