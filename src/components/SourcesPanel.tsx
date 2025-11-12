@@ -1,4 +1,4 @@
-import { FileText, X, ChevronDown } from "lucide-react";
+import { FileText, X, ChevronRight, ExternalLink, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState } from "react";
 
 interface Message {
   id: string;
@@ -30,17 +32,57 @@ interface SourcesPanelProps {
 }
 
 export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
-  // Extract sources and matches from assistant messages with metadata
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<{
+    title: string;
+    index: string;
+    matches: string[];
+    timestamp: Date;
+  } | null>(null);
+
+  // Extract sources and split matches per source (first match -> first source, etc.)
   const sourcesData = messages
     .filter((msg) => msg.role === "assistant" && msg.metadata?.sources)
-    .map((msg) => ({
-      id: msg.id,
-      sources: msg.metadata!.sources || [],
-      matches: msg.metadata!.matches || [],
-      timestamp: msg.timestamp,
-    }));
+    .map((msg) => {
+      const sources = msg.metadata!.sources || [];
+      const matches = msg.metadata!.matches || [];
+      const count = Math.max(1, sources.length);
+      const base = Math.floor(matches.length / count);
+      const extra = matches.length % count;
+      let idx = 0;
+      const chunks = new Array(count).fill(0).map((_, i) => {
+        const size = base + (i < extra ? 1 : 0);
+        const arr = matches.slice(idx, idx + size);
+        idx += size;
+        return arr;
+      });
+      const withMatches = sources.map((s, i) => ({ ...s, matches: chunks[i] || [] }));
+      return { id: msg.id, sources: withMatches, timestamp: msg.timestamp };
+    });
 
   const hasAssistant = messages.some(m => m.role === 'assistant');
+
+  const isUrl = (value: string) => {
+    try {
+      const u = new URL(value);
+      return !!u.protocol && !!u.host;
+    } catch {
+      return /^https?:\/\//i.test(value);
+    }
+  };
+
+  const openDetails = (
+    source: { title: string; index: string; matches?: string[] },
+    context: { timestamp: Date }
+  ) => {
+    setSelected({
+      title: source.title,
+      index: source.index,
+      matches: source.matches || [],
+      timestamp: context.timestamp,
+    });
+    setOpen(true);
+  };
 
   return (
     <div className="flex flex-col h-full bg-background border-l border-border w-full min-w-0">
@@ -76,17 +118,22 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
               <CardContent className="pt-0 space-y-3">
                 {/* Sources */}
                 {data.sources.map((source, idx) => (
-                  <div key={idx} className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                  <button
+                    key={idx}
+                    onClick={() => openDetails(source as any, { timestamp: data.timestamp })}
+                    className="w-full text-left flex items-center gap-2 p-2 bg-muted/50 hover:bg-muted rounded-lg transition-colors group"
+                  >
                     <FileText className="h-4 w-4 text-primary" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{source.title}</p>
-                      <p className="text-xs text-muted-foreground">{source.index}</p>
+                      <p className="text-sm font-medium truncate text-foreground">{source.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{source.index}</p>
                     </div>
-                  </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100" />
+                  </button>
                 ))}
 
                 {/* Matches Accordion */}
-                {data.matches.length > 0 && (
+                {false && data.sources.some((s: any) => s.matches && s.matches.length > 0) && (
                   <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="matches" className="border-none">
                       <AccordionTrigger className="text-sm font-medium hover:no-underline py-2">
@@ -142,6 +189,69 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
           )
         )}
       </ScrollArea>
+
+      {/* Details Dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="w-[min(92vw,48rem)] max-w-3xl max-h-[80vh] bg-card border border-border shadow-2xl sm:rounded-xl grid-rows-[auto,1fr,auto]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-foreground">
+              <FileText className="h-5 w-5 text-primary" />
+              {selected?.title || "Детайли за източника"}
+            </DialogTitle>
+            <DialogDescription>
+              {selected?.timestamp ? new Date(selected.timestamp).toLocaleString('bg-BG') : null}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 overflow-auto max-h-[60vh] pr-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Източник</p>
+                <p className="text-sm text-foreground break-all">{selected?.index}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0 justify-end">
+                {selected?.index && isUrl(selected.index) && (
+                  <a
+                    href={selected.index}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    Отвори <ExternalLink className="h-4 w-4" />
+                  </a>
+                )}
+                {selected?.index && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { try { navigator.clipboard.writeText(selected.index); } catch {} }}
+                  >
+                    <Copy className="h-4 w-4 mr-1" /> Копирай
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Related matches */}
+            {selected && selected.matches && selected.matches.length > 0 && (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Свързани съвпадения</p>
+                <div className="space-y-2 max-h-64 overflow-auto pr-1">
+                  {selected.matches.map((m, i) => (
+                    <div key={i} className="p-3 bg-muted/40 rounded-lg border border-border">
+                      <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">{m}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setOpen(false)} variant="secondary">Затвори</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
