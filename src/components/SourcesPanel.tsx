@@ -180,10 +180,7 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
 
           <div className="space-y-4 overflow-auto max-h-[60vh] pr-1">
             <div className="flex items-start justify-start gap-3">
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Индекс</p>
-                <p className="text-sm text-foreground break-all">{selected?.index}</p>
-              </div>
+              
               <div className="flex flex-wrap items-center gap-2 shrink-0 justify-end">
                 {selected?.index && isUrl(selected.index) && (
                   <a
@@ -199,7 +196,7 @@ export function SourcesPanel({ onClose, messages }: SourcesPanelProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => copyToClipboard(selected?.index)}
+                    onClick={() => copyToClipboard(selected?.matches.join(" "))}
                   >
                     <Copy className="h-4 w-4 mr-1" /> Копирай
                   </Button>
