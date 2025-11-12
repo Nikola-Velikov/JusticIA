@@ -51,6 +51,26 @@ const Index = () => {
       }
     })();
   }, [navigate]);
+  // If coming from guards/login, create a fresh chat but reuse existing empty chat if present
+  useEffect(() => {
+    if (loading) return;
+    try {
+      const wantsNew = sessionStorage.getItem('newChatOnNextVisit');
+      if (wantsNew) {
+        sessionStorage.removeItem('newChatOnNextVisit');
+        // Prefer existing empty chat if we have recorded one
+        try {
+          const emptyId = localStorage.getItem('emptyChatId');
+          if (emptyId && chats.some(c => c.id === emptyId)) {
+            selectChat(emptyId);
+            return;
+          }
+        } catch {}
+        createNewChat();
+      }
+    } catch {}
+  }, [loading, chats, selectChat, createNewChat]);
+
 
   // Auto-select last opened chat (from localStorage) or the most recent one
   useEffect(() => {
@@ -162,3 +182,4 @@ const Index = () => {
 };
 
 export default Index;
+

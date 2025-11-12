@@ -49,6 +49,7 @@ export function useChat() {
     // Reuse current empty chat if present
     if (currentChatId && messages.length === 0) {
       try { localStorage.setItem('lastChatId', currentChatId); } catch {}
+      try { localStorage.setItem('emptyChatId', currentChatId as string); } catch {}
       return currentChatId;
     }
     const chat = await apiPost<{ id: string; title: string; createdAt: string }>(`/chats`, {});
@@ -56,6 +57,7 @@ export function useChat() {
     setCurrentChatId(chat.id);
     setMessages([]);
     try { localStorage.setItem('lastChatId', chat.id); } catch {}
+    try { localStorage.setItem('emptyChatId', chat.id); } catch {}
     return chat.id;
   }, [loadChats, currentChatId, messages.length]);
 
@@ -101,6 +103,8 @@ export function useChat() {
         if (messages.length === 0) {
           await loadChats();
         }
+        // Mark chat as non-empty
+        try { if (activeChatId) { const eid = localStorage.getItem('emptyChatId'); if (eid === activeChatId) localStorage.removeItem('emptyChatId'); } } catch {}
       } catch (e: any) {
         if (e?.name === 'AbortError') {
           // request cancelled by user
@@ -186,6 +190,20 @@ export function useChat() {
         setMessages([]);
       }
       await loadChats();
+      // Redirect to newest remaining chat (most recent createdAt)
+      try {
+        const data = await apiGet<Array<{ id: string; title: string; createdAt: string }>>('/chats');
+        const updated = data.map((c) => ({ id: c.id, title: c.title, timestamp: new Date(c.createdAt) }));
+        setChats(updated);
+        if (updated.length > 0) {
+          const newestId = updated[0].id;
+          setCurrentChatId(newestId);
+          try { localStorage.setItem('lastChatId', newestId); } catch {}
+          try { await loadMessages(newestId); } catch {}
+        } else {
+          try { localStorage.removeItem('lastChatId'); } catch {}
+        }
+      } catch {}
     } catch (e: any) {
       toast({ title: 'Грешка', description: userError(e, 'Неуспешно изтриване на чат'), variant: 'destructive' });
     }
@@ -203,7 +221,6 @@ export function useChat() {
       try { localStorage.setItem('lastChatId', chatId); } catch {}
     } catch (e: any) {
       setMessages([]);
-      toast({ title: 'Грешка', description: 'Чатът не е намерен.', variant: 'destructive' });
       await loadChats();
     }
   }, [loadMessages, loadChats, toast, currentChatId, messages.length]);
@@ -288,3 +305,5 @@ export function useChat() {
   const isLoading = loadingChatId === currentChatId;
   return { chats, messages, currentChatId, isLoading, sendMessage, stopSending, editLastMessage, deleteChat, selectChat, createNewChat };
 }
+
+

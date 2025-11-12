@@ -23,7 +23,7 @@ export default function Login() {
       const res = await apiPost<{ token: string; user: { id: string; email: string } }>(`/auth/login`, { email, password });
       localStorage.setItem('token', res.token);
       toast({ title: "Успешно!", description: "Вие влязохте успешно." });
-      navigate("/chat");
+      try { sessionStorage.setItem('newChatOnNextVisit','1'); localStorage.removeItem('lastChatId'); } catch {} navigate("/chat");
     } catch (error: any) {
       toast({ title: "Неуспешен вход", description: userError(error, 'Невалиден имейл или парола'), variant: "destructive" });
     } finally {
@@ -70,3 +70,4 @@ export default function Login() {
     </div>
   );
 }
+

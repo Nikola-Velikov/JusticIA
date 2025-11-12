@@ -32,7 +32,7 @@ export default function Signup() {
       const res = await apiPost<{ token: string; user: { id: string; email: string } }>(`/auth/signup`, { email, password });
       localStorage.setItem('token', res.token);
       toast({ title: "Успешно!", description: "Вашият акаунт беше създаден." });
-      navigate("/chat");
+      try { sessionStorage.setItem('newChatOnNextVisit','1'); localStorage.removeItem('lastChatId'); } catch {} navigate("/chat");
     } catch (error: any) {
       toast({ title: "Неуспешна регистрация", description: userError(error, 'Неуспешна регистрация. Опитайте отново.'), variant: "destructive" });
     } finally {
@@ -79,3 +79,4 @@ export default function Signup() {
     </div>
   );
 }
+
