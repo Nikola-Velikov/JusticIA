@@ -147,7 +147,19 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
             </div>
           ) : null}
 
-          {messages.map((message) => (
+          {messages.map((message, idx) => {
+            let thoughtSecs: number | null = null;
+            if (message.role === 'assistant') {
+              for (let i = idx - 1; i >= 0; i--) {
+                const prev = messages[i];
+                if (prev.role === 'user') {
+                  const dt = (new Date(message.timestamp).getTime() - new Date(prev.timestamp).getTime()) / 1000;
+                  thoughtSecs = Math.max(1, Math.floor(isFinite(dt) ? dt : 1));
+                  break;
+                }
+              }
+            }
+            return (
             <div
               key={message.id}
               className={`flex gap-4 ${
@@ -169,6 +181,11 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
                     : "bg-chat-bubble-assistant text-foreground border border-border animate-in fade-in slide-in-from-bottom-1"
                 }`}
               >
+                {message.role === 'assistant' && thoughtSecs !== null && (
+                  <div className="text-[11px] font-bold text-muted-foreground mb-1">
+                    Търсенето приключи за {thoughtSecs} сек
+                  </div>
+                )}
                 <div className="text-sm leading-relaxed whitespace-pre-wrap">
                   {message.role === "assistant" ? (
                     <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap">
@@ -223,7 +240,8 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
                 </Avatar>
               )}
             </div>
-          ))}
+            );
+          })}
           
           {isLoading && (
             <div className="flex gap-4 justify-start">

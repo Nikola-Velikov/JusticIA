@@ -66,7 +66,7 @@ const Landing = () => {
             <span className="text-primary">българското законодателство</span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Получете незабавни отговори на вашите правни въпроси с помощта на изкуствен интелект, 
+            Получете незабавни отговори на вашите правни въпроси с помощта на изкуствен асистент, 
             обучен върху цялото българско законодателство.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -123,7 +123,7 @@ const Landing = () => {
               <CardTitle>Пълна база от източници</CardTitle>
               <CardDescription>
                 Достъп до Конституцията, Гражданския кодекс, Наказателния кодекс и всички 
-                останали български закони.
+                други нормативни актове.
               </CardDescription>
             </CardHeader>
           </Card>

@@ -1,0 +1,440 @@
+
+import { MessageSquare, Plus, MoreHorizontal, Trash2, Edit3, PanelLeftClose, PanelLeftOpen, LogIn, UserPlus, Search, Folder, FolderPlus, Link2 } from "lucide-react";
+import React, { useMemo, useState, useEffect } from 'react';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+interface Chat {
+  id: string;
+  title: string;
+  lastMessage?: string;
+  timestamp: Date;
+}
+
+interface ChatSidebarProps {
+  onNewChat: () => void;
+  onSelectChat: (chatId: string) => void;
+  onDeleteChat?: (chatId: string) => void;
+  activeChat?: string;
+  chats?: Chat[];
+  user?: { name: string; email: string };
+  onLogin: () => void;
+  onRegister: () => void;
+  onLogout?: () => void;
+}
+
+export function ChatSidebar({ onNewChat, onSelectChat, onDeleteChat, activeChat, chats = [], user, onLogin, onRegister, onLogout }: ChatSidebarProps) {
+  const [query, setQuery] = useState("");
+  type Case = { id: string; name: string; chatIds: string[]; createdAt: string };
+  const [cases, setCases] = useState<Case[]>([]);
+  const [openCases, setOpenCases] = useState<Record<string, boolean>>({});
+  const [showCases, setShowCases] = useState(true);
+  const { apiGet, apiPost, apiDelete } = require("@/lib/api");
+
+  const loadCases = async () => {
+    try { const data = await apiGet<Case[]>(`/cases`); setCases(data); } catch {}
+  };
+  useEffect(() => { loadCases(); }, []);
+
+  const createCase = async () => {
+    const name = window.prompt('Име на папката');
+    if (!name) return;
+    try { await apiPost(`/cases`, { name }); await loadCases(); } catch {}
+  };
+  const renameCase = async (id: string) => {
+    const cs = cases.find(c => c.id === id); if (!cs) return;
+    const name = window.prompt('Ново име', cs.name);
+    if (!name) return;
+    try { await apiPost(`/cases/${id}`, { name }, { methodOverride: 'PATCH' as any }); await loadCases(); } catch {}
+  };
+  const deleteCase = async (id: string) => { try { await apiDelete(`/cases/${id}`); await loadCases(); } catch {} };
+  const addChatToCase = async (caseId: string, chatId: string) => { try { await apiPost(`/cases/${caseId}/chats`, { chatId }); await loadCases(); } catch {} };
+  const removeChatFromCase = async (caseId: string, chatId: string) => { try { await apiDelete(`/cases/${caseId}/chats/${chatId}`); await loadCases(); } catch {} };
+  type Case = { id: string; name: string; chatIds: string[]; createdAt: string };
+  const loadCases = (): Case[] => { try { return JSON.parse(localStorage.getItem('cases.v1') || '[]') as Case[] } catch { return [] } };
+  const [cases, setCases] = useState<Case[]>(loadCases());
+  const [openCases, setOpenCases] = useState<Record<string, boolean>>({});
+  const saveCases = (next: Case[]) => { setCases(next); try { localStorage.setItem('cases.v1', JSON.stringify(next)); } catch {} };
+  const createCase = () => { const name = window.prompt('Име на папката'); if (!name) return; const c: Case = { id: `case-${Date.now()}`, name, chatIds: [], createdAt: new Date().toISOString() }; saveCases([c, ...cases]); };
+  const renameCase = (id: string) => { const cs=[...cases]; const i=cs.findIndex(c=>c.id===id); if(i===-1) return; const name=window.prompt('Ново име', cs[i].name); if(!name) return; cs[i].name=name; saveCases(cs); };
+  const deleteCase = (id: string) => { saveCases(cases.filter(c=>c.id!==id)); };
+  const createChatInCase = async (caseId: string) => { try { await onNewChat(); } catch {} setTimeout(()=>{ try { const last=localStorage.getItem('lastChatId'); if(!last) return; const cs=[...cases]; const c=cs.find(x=>x.id===caseId); if(!c) return; if(!c.chatIds.includes(last)) c.chatIds.unshift(last); saveCases(cs);} catch {} }, 150); };
+  const addExistingToCase = (caseId: string) => {
+    const q = window.prompt('Добави съществуващ чат (въведете част от заглавието)');
+    if (!q) return;
+    const found = chats.find(c => c.title.toLowerCase().includes(q.toLowerCase()));
+    if (!found) { alert('Няма намерен чат.'); return; }
+    const cs=[...cases]; const c=cs.find(x=>x.id===caseId); if(!c) return; if(!c.chatIds.includes(found.id)) c.chatIds.unshift(found.id); saveCases(cs);
+  };
+  const removeFromCase = (caseId: string, chatId: string) => { const cs=[...cases]; const c=cs.find(x=>x.id===caseId); if(!c) return; c.chatIds=c.chatIds.filter(id=>id!==chatId); saveCases(cs); };
+  const filteredChats = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return chats;
+    return chats.filter(c => c.title.toLowerCase().includes(q) || (c.lastMessage || '').toLowerCase().includes(q));
+  }, [chats, query]);
+  const chatsInAnyCase = useMemo(() => new Set(cases.flatMap(c => c.chatIds)), [cases]);
+  const unclassifiedChats = useMemo(() => filteredChats.filter(c => !chatsInAnyCase.has(c.id)), [filteredChats, chatsInAnyCase]);
+
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  };
+
+  const { state, toggleSidebar } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
+  return (
+    <Sidebar className="border-r border-border bg-background">
+      <SidebarContent className="flex flex-col h-full">
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className={`font-semibold text-lg ${isCollapsed ? 'hidden' : 'block'}`}>Justic<span className="text-primary">IA</span></h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleSidebar}
+              className="h-8 w-8 p-0"
+            >
+              {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            </Button>
+          </div>
+          
+          {!isCollapsed && (
+            <div className="mb-4">
+              <Button
+                onClick={onNewChat}
+                className="w-full justify-start gap-3 bg-primary hover:bg-primary-hover text-primary-foreground"
+                size="lg"
+              >
+                <Plus className="h-4 w-4" />
+                Нов Чат
+              </Button>
+            </div>
+          )}
+
+          {isCollapsed && (
+            <div className="flex flex-col items-center space-y-4">
+              <Button
+                onClick={onNewChat}
+                className="w-8 h-8 p-0 bg-primary hover:bg-primary-hover text-primary-foreground"
+                size="sm"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {!isCollapsed && (
+            <div className="px-4">
+              {/* Folders (Cases) */}
+              <SidebarGroup>
+                <SidebarGroupLabel className="text-sm font-medium text-muted-foreground mb-2 flex items-center justify-between">
+                  <button className="inline-flex items-center gap-2" onClick={() => setShowCases(v=>!v)}>
+                    <Folder className="h-4 w-4" /> Папки
+                  </button>
+                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={createCase}>
+                    <FolderPlus className="h-4 w-4" />
+                  </Button>
+                </SidebarGroupLabel>
+                {showCases && (
+                  <SidebarGroupContent>
+                    <SidebarMenu className="space-y-1">
+                      {cases.length === 0 ? (
+                        <div className="text-sm text-muted-foreground p-3">Няма папки</div>
+                      ) : cases.map((c) => {
+                        const isOpen = !!openCases[c.id];
+                        const toggle = () => setOpenCases(prev => ({...prev, [c.id]: !prev[c.id]}));
+                        const chatsInCase = filteredChats.filter(ch => c.chatIds.includes(ch.id));
+                        return (
+                          <SidebarMenuItem key={c.id}>
+                            <div className="w-full">
+                              <div className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent">
+                                <Button variant="ghost" size="sm" className="h-6 px-2" onClick={toggle}>
+                                  <Folder className="h-4 w-4 mr-2" /> {c.name}
+                                </Button>
+                                <div className="ml-auto flex items-center gap-1">
+                                  <Button variant="ghost" size="sm" className="h-6 px-2" title="Нов чат" onClick={async () => { await onNewChat(); /* will be in unclassified until user moves */ }}> <Plus className="h-4 w-4" /> </Button>
+                                  <Button variant="ghost" size="sm" className="h-6 px-2" title="Добави съществуващ" onClick={() => {
+                                    const name = window.prompt('Име на папката за добавяне? (текуща: '+c.name+')\nОставете празно за текущата.');
+                                    const targetId = (name && cases.find(x=>x.name.toLowerCase()===name.toLowerCase())?.id) || c.id;
+                                    const pick = window.prompt('Въведете част от заглавието на чата'); if (!pick) return; const found = chats.find(x=>x.title.toLowerCase().includes(pick.toLowerCase())); if (found) addChatToCase(targetId, found.id);
+                                  }}>
+                                    <Link2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" className="h-6 px-2" title="Преименувай" onClick={() => renameCase(c.id)}> <Edit3 className="h-4 w-4" /> </Button>
+                                  <Button variant="ghost" size="sm" className="h-6 px-2" title="Изтрий папка" onClick={() => deleteCase(c.id)}> <Trash2 className="h-4 w-4" /> </Button>
+                                </div>
+                              </div>
+                              {isOpen && (
+                                <div className="pl-6 py-1 space-y-1">
+                                  {chatsInCase.length === 0 ? (
+                                    <div className="text-xs text-muted-foreground px-2 py-1">Празна папка</div>
+                                  ) : chatsInCase.map(chat => (
+                                    <div key={chat.id} className={`flex items-center gap-2 px-2 py-1 rounded-md ${activeChat===chat.id?'bg-accent':''}`}>
+                                      <Button variant="ghost" size="sm" className="h-6 px-2 flex-1 justify-start" onClick={() => onSelectChat(chat.id)}>
+                                        <MessageSquare className="h-3.5 w-3.5 mr-2" />
+                                        <span className="truncate text-sm">{chat.title}</span>
+                                      </Button>
+                                      <Button variant="ghost" size="sm" className="h-6 px-2" title="Премахни" onClick={() => removeChatFromCase(c.id, chat.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                )}
+              </SidebarGroup>
+              {/* Cases section */}
+              <SidebarGroup>
+                <SidebarGroupLabel className="text-sm font-medium text-muted-foreground mb-2 flex items-center justify-between">
+                  <span>Папки</span>
+                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={createCase}>
+                    <FolderPlus className="h-4 w-4" />
+                  </Button>
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="space-y-1">
+                    {cases.length === 0 ? (
+                      <div className="text-sm text-muted-foreground p-3">Няма папки</div>
+                    ) : cases.map((c) => {
+                      const isOpen = !!openCases[c.id];
+                      const toggle = () => setOpenCases(prev => ({...prev, [c.id]: !prev[c.id]}));
+                      const chatsInCase = chats.filter(ch => c.chatIds.includes(ch.id));
+                      return (
+                        <SidebarMenuItem key={c.id}>
+                          <div className="w-full">
+                            <div className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent">
+                              <Button variant="ghost" size="sm" className="h-6 px-2" onClick={toggle}>
+                                <Folder className="h-4 w-4 mr-2" /> {c.name}
+                              </Button>
+                              <div className="ml-auto flex items-center gap-1">
+                                <Button variant="ghost" size="sm" className="h-6 px-2" title="Нов чат" onClick={() => createChatInCase(c.id)}>
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-6 px-2" title="Добави съществуващ" onClick={() => addExistingToCase(c.id)}>
+                                  <Edit3 className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-6 px-2" title="Преименувай" onClick={() => renameCase(c.id)}>
+                                  <Edit3 className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-6 px-2" title="Изтрий папка" onClick={() => deleteCase(c.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            {isOpen && (
+                              <div className="pl-6 py-1 space-y-1">
+                                {chatsInCase.length === 0 ? (
+                                  <div className="text-xs text-muted-foreground px-2 py-1">Празна папка</div>
+                                ) : chatsInCase.map(chat => (
+                                  <div key={chat.id} className={`flex items-center gap-2 px-2 py-1 rounded-md ${activeChat===chat.id?'bg-accent':''}`}>
+                                    <Button variant="ghost" size="sm" className="h-6 px-2 flex-1 justify-start" onClick={() => onSelectChat(chat.id)}>
+                                      <MessageSquare className="h-3.5 w-3.5 mr-2" />
+                                      <span className="truncate text-sm">{chat.title}</span>
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="h-6 px-2" title="Премахни" onClick={() => removeFromCase(c.id, chat.id)}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+              <div className="relative mb-3">
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Търсене в чатове..."
+                  className="w-full rounded-md border border-border bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-2.5" />
+              </div>
+              <SidebarGroup>
+                <SidebarGroupLabel className="text-sm font-medium text-muted-foreground mb-2">
+                  Скорошни Чатове
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="space-y-1">
+                    {filteredChats.length === 0 ? (
+                      <div className="text-sm text-muted-foreground p-3">Няма намерени чатове</div>
+                    ) : filteredChats.map((chat) => (
+                      <SidebarMenuItem key={chat.id}>
+                        <div className="group relative">
+                          <SidebarMenuButton
+                            onClick={() => onSelectChat(chat.id)}
+                            className={`w-full justify-start p-3 h-auto hover:bg-accent ${
+                              activeChat === chat.id ? 'bg-accent' : ''
+                            }`}
+                          >
+                            <div className="flex items-start gap-3 w-full">
+                              <MessageSquare className="h-4 w-4 mt-1 text-muted-foreground flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-foreground truncate">
+                                  {chat.title}
+                                </div>
+                                {chat.lastMessage && (
+                                  <div className="text-xs text-muted-foreground truncate mt-1">
+                                    {chat.lastMessage}
+                                  </div>
+                                )}
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {formatTime(chat.timestamp)}
+                                </div>
+                              </div>
+                            </div>
+                          </SidebarMenuButton>
+                          
+                          {onDeleteChat && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 h-6 w-6 p-0"
+                                >
+                                  <MoreHorizontal className="h-3 w-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-background border border-border z-50">
+                                <DropdownMenuItem onClick={() => onDeleteChat(chat.id)} className="text-destructive">
+                                  <Trash2 className="h-3 w-3 mr-2" />
+                                  Изтрий
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </div>
+          )}
+          
+          {isCollapsed && (
+            <div className="flex flex-col items-center space-y-2 px-2">
+              {chats.slice(0, 3).map((chat) => (
+                <Button
+                  key={chat.id}
+                  onClick={() => onSelectChat(chat.id)}
+                  variant="ghost"
+                  size="sm"
+                  className={`w-8 h-8 p-0 ${activeChat === chat.id ? 'bg-accent' : ''}`}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Bottom section */}
+        {!user ? (
+          <div className="p-4 border-t border-border">
+            {!isCollapsed && (
+              <div className="space-y-2">
+                <Button
+                  onClick={onLogin}
+                  variant="outline"
+                  className="w-full justify-start gap-3"
+                  size="sm"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Вход
+                </Button>
+                <Button
+                  onClick={onRegister}
+                  className="w-full justify-start gap-3 bg-primary hover:bg-primary-hover text-primary-foreground"
+                  size="sm"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Регистрация
+                </Button>
+              </div>
+            )}
+            
+            {isCollapsed && (
+              <div className="flex flex-col items-center space-y-2">
+                <Button
+                  onClick={onLogin}
+                  variant="outline"
+                  size="sm"
+                  className="w-8 h-8 p-0"
+                >
+                  <LogIn className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={onRegister}
+                  size="sm"
+                  className="w-8 h-8 p-0 bg-primary hover:bg-primary-hover text-primary-foreground"
+                >
+                  <UserPlus className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 border-t border-border">
+            {!isCollapsed ? (
+              <div className="flex items-center justify-between">
+                <div className="text-sm">
+                  <div className="font-medium">{user.name}</div>
+                  <div className="text-muted-foreground truncate max-w-[10rem]">{user.email}</div>
+                </div>
+                {onLogout && (
+                  <Button size="sm" variant="outline" onClick={onLogout}>
+                    Изход
+                  </Button>
+                )}
+              </div>
+            ) : (
+              onLogout && (
+                <div className="flex items-center justify-center">
+                  <Button size="sm" variant="outline" onClick={onLogout} className="w-8 h-8 p-0">⎋</Button>
+                </div>
+              )
+            )}
+          </div>
+        )}
+      </SidebarContent>
+    </Sidebar>
+  );
+}

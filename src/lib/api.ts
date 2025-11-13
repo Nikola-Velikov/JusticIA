@@ -41,6 +41,17 @@ export async function apiPost<T>(path: string, body?: any, init?: RequestInit): 
   return res.json();
 }
 
+export async function apiPatch<T>(path: string, body?: any, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}/api${path}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeader(), ...(init?.headers || {}) },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: init?.signal,
+  });
+  if (!res.ok) throw await extractError(res);
+  return res.json();
+}
+
 export async function apiDelete(path: string): Promise<void> {
   const res = await fetch(`${BASE}/api${path}`, { method: 'DELETE', headers: { ...authHeader() } });
   if (!res.ok) throw await extractError(res);
