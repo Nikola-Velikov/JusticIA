@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiDelete, apiGet, apiPost, userError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { SourceOption } from "@/types/generator";
 
 export interface Message {
   id: string;
@@ -13,6 +14,7 @@ export interface Message {
     sources?: Array<{ index: string; title: string }>;
     matches?: string[];
     results_count?: number;
+    options?: SourceOption;
   };
 }
 
@@ -62,9 +64,10 @@ export function useChat() {
   }, [loadChats, currentChatId, messages.length]);
 
   const sendMessage = useCallback(
-    async (content: string, chatId?: string) => {
+    async (content: string, options: SourceOption = "all", chatId?: string) => {
       if (loadingChatId) return; // prevent concurrent sends unless stopped
       let activeChatId = chatId || currentChatId;
+      const selectedOption = options || "all";
       setLoadingChatId(activeChatId);
       try {
         if (!activeChatId) {
@@ -74,13 +77,13 @@ export function useChat() {
 
         // Add user message immediately (placeholder)
         const tempId = `temp-${Date.now()}`;
-        const userMsg = { id: tempId, content, role: "user" as const, timestamp: new Date() };
+        const userMsg = { id: tempId, content, role: "user" as const, timestamp: new Date(), metadata: { options: selectedOption } };
         setMessages((prev) => [...prev, userMsg]);
 
         const ac = new AbortController();
         setController(ac);
 
-        const result = await apiPost<{ userMessage: any; assistantMessage: any }>(`/chats/${activeChatId}/messages/send`, { content }, { signal: ac.signal });
+        const result = await apiPost<{ userMessage: any; assistantMessage: any }>(`/chats/${activeChatId}/messages/send`, { content, options: selectedOption }, { signal: ac.signal });
 
         // Replace placeholder user message with persisted one
         setMessages((prev) => prev.map(m => m.id === tempId ? {
@@ -88,6 +91,7 @@ export function useChat() {
           content: result.userMessage.content,
           role: 'user',
           timestamp: new Date(result.userMessage.createdAt),
+          metadata: result.userMessage.metadata ?? { options: selectedOption },
         } : m));
 
         // Append assistant message
@@ -127,7 +131,7 @@ export function useChat() {
     setLoadingChatId(undefined);
   }, [controller]);
 
-  const editLastMessage = useCallback(async (messageId: string, content: string) => {
+  const editLastMessage = useCallback(async (messageId: string, content: string, options: SourceOption = "all") => {
     if (!currentChatId) return;
     // Optimistically remove the last pair if it starts with this user message
     const idx = messages.findIndex(m => m.id === messageId);
@@ -138,30 +142,32 @@ export function useChat() {
 
     // If temp/non-ObjectId id, stop current request and send as new message instead of editing
     const isObjectId = /^[a-fA-F0-9]{24}$/.test(messageId);
+    const selectedOption = options || "all";
     if (!isObjectId) {
       if (controller) controller.abort();
       setMessages(optimistic);
       setLoadingChatId(undefined);
-      await sendMessage(content, currentChatId);
+      await sendMessage(content, selectedOption, currentChatId);
       return;
     }
 
     // Normal edit flow with placeholder
     const tempId = `temp-edit-${Date.now()}`;
-    const tempUser = { id: tempId, content, role: 'user' as const, timestamp: new Date() };
+    const tempUser = { id: tempId, content, role: 'user' as const, timestamp: new Date(), metadata: { options: selectedOption } };
     setMessages([...optimistic, tempUser]);
 
     const ac = new AbortController();
     setController(ac);
     setLoadingChatId(currentChatId);
     try {
-      const result = await apiPost<{ userMessage: any; assistantMessage: any }>(`/chats/${currentChatId}/messages/edit`, { messageId, content }, { signal: ac.signal });
+      const result = await apiPost<{ userMessage: any; assistantMessage: any }>(`/chats/${currentChatId}/messages/edit`, { messageId, content, options: selectedOption }, { signal: ac.signal });
       setMessages(prev => (
         prev.map(m => m.id === tempId ? {
           id: result.userMessage.id,
           content: result.userMessage.content,
           role: 'user' as const,
           timestamp: new Date(result.userMessage.createdAt),
+          metadata: result.userMessage.metadata ?? { options: selectedOption },
         } : m).concat([
           {
             id: result.assistantMessage.id,

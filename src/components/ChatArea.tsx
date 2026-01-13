@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Paperclip, Square, Copy, Pencil } from "lucide-react";
+import { Send, Bot, User, Paperclip, Square, Copy, Pencil, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { SourceOption } from "@/types/generator";
 import ReactMarkdown from "react-markdown";
 
 interface Message {
@@ -12,18 +15,51 @@ interface Message {
   content: string;
   role: "user" | "assistant";
   timestamp: Date;
+  metadata?: {
+    options?: SourceOption;
+    [key: string]: unknown;
+  };
 }
 
 interface ChatAreaProps {
   messages: Message[];
   isLoading: boolean;
-  onSendMessage: (content: string) => void;
+  onSendMessage: (content: string, options: SourceOption) => void;
   onStop?: () => void;
-  onEditMessage?: (messageId: string, content: string) => void;
+  onEditMessage?: (messageId: string, content: string, options: SourceOption) => void;
   user?: { name: string; email: string };
   onLogout: () => void;
   onEditingChange?: (state: { id: string; active: boolean } | null) => void;
 }
+
+
+const SOURCE_OPTIONS: Array<{ value: SourceOption; label: string; description: string; badge: string }> = [
+  {
+    value: "all",
+    label: "Комбинирано покритие (БГ + ЕС, на български)",
+    description: "Смесва българско законодателство с европейски регламенти и директиви на български език за по-богат контекст.",
+    badge: "БГ + ЕС",
+  },
+  {
+    value: "bg",
+    label: "Европейско право (регламенти и директиви на български)",
+    description: "Фокус върху европейски регламенти и директиви в български превод.",
+    badge: "EU BG",
+  },
+  {
+    value: "en",
+    label: "Европейско право (регламенти и директиви на английски)",
+    description: "Използва официалните текстове на английски за сравнения и детайли.",
+    badge: "EU EN",
+  },
+  {
+    value: "old",
+    label: "Българско законодателство",
+    description: "Търси само в националното законодателство на България.",
+    badge: "БГ Закон",
+  },
+];
+
 
 export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMessage, user, onLogout, onEditingChange }: ChatAreaProps) {
   const [input, setInput] = useState("");
@@ -31,13 +67,15 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
   const [editing, setEditing] = useState<{ id: string, active: boolean } | null>(null);
   const [typedMap, setTypedMap] = useState<Record<string, string>>({});
   const typingTimer = useRef<number | null>(null);
+  const [sourceOption, setSourceOption] = useState<SourceOption>("all");
+  const [sourceCollapsed, setSourceCollapsed] = useState(false);
 
   const handleSend = async () => {
     if (!input.trim()) return;
     const messageText = input.trim();
     if (editing?.active && editing.id) {
       if (isLoading) onStop?.();
-      onEditMessage?.(editing.id, messageText);
+      onEditMessage?.(editing.id, messageText, sourceOption);
       setEditing(null);
       onEditingChange?.(null);
       setInput("");
@@ -45,7 +83,7 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
     }
     if (isLoading) return;
     setInput("");
-    onSendMessage(messageText);
+    onSendMessage(messageText, sourceOption);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -125,6 +163,8 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
     try { await navigator.clipboard.writeText(text); } catch {}
   };
 
+  const selectedSource = SOURCE_OPTIONS.find((option) => option.value === sourceOption) || SOURCE_OPTIONS[0];
+
   return (
     <div className="flex flex-col h-full bg-background w-full min-w-0">
       {/* Messages Area */}
@@ -139,9 +179,9 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
                 <h3 className="text-2xl font-bold text-foreground mb-2">Започнете разговора</h3>
                 <p className="text-sm text-muted-foreground mb-6">Задайте правен въпрос или изберете някой от примерите:</p>
                 <div className="grid gap-3">
-                  <Button variant="outline" className="justify-start text-left border-primary/20 hover:bg-primary/10" onClick={() => onSendMessage("Какво гласи Конституцията на България?")}>Какво гласи Конституцията на България?</Button>
-                  <Button variant="outline" className="justify-start text-left border-primary/20 hover:bg-primary/10" onClick={() => onSendMessage("Как се използва платения годишен отпуск?")}>Как се използва платения годишен отпуск?</Button>
-                  <Button variant="outline" className="justify-start text-left border-primary/20 hover:bg-primary/10" onClick={() => onSendMessage("Как се сключва трудов договор?")}>Как се сключва трудов договор?</Button>
+                  <Button variant="outline" className="justify-start text-left border-primary/20 hover:bg-primary/10" onClick={() => onSendMessage("Какво гласи Конституцията на България?", "old")}>Какво гласи Конституцията на България?</Button>
+                  <Button variant="outline" className="justify-start text-left border-primary/20 hover:bg-primary/10" onClick={() => onSendMessage("Как се използва платения годишен отпуск?", 'old')}>Как се използва платения годишен отпуск?</Button>
+                  <Button variant="outline" className="justify-start text-left border-primary/20 hover:bg-primary/10" onClick={() => onSendMessage("Как се сключва трудов договор?", 'old')}>Как се сключва трудов договор?</Button>
                 </div>
               </div>
             </div>
@@ -211,7 +251,7 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(message.content)}>
                           <Copy className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { onStop?.(); const st = { id: message.id, active: true }; setEditing(st); onEditingChange?.(st); setInput(message.content); }}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { onStop?.(); const st = { id: message.id, active: true }; setEditing(st); onEditingChange?.(st); setInput(message.content); setSourceOption(message.metadata?.options ?? "all"); }}>
                           <Pencil className="h-3 w-3" />
                         </Button>
                       </>
@@ -265,6 +305,67 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
       {/* Input Area */}
       <div className="border-t border-border p-4 w-full min-w-0">
         <div className="w-full min-w-0">
+          <div className="mb-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-primary">
+                  <Sparkles className="h-4 w-4" />
+                  <span>Източник на съдържание</span>
+                </div>
+                <div className="flex items-center gap-2">
+               
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs text-primary hover:text-primary"
+                    onClick={() => setSourceCollapsed((v) => !v)}
+                  >
+                    {sourceCollapsed ? "Покажи" : "Скрий"}
+                  </Button>
+                </div>
+            </div>
+            {!sourceCollapsed && (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border border-border/70 bg-card/80 shadow-[0_12px_40px_rgba(0,0,0,0.06)] backdrop-blur">
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-[10px] tracking-wide uppercase bg-primary/10 text-primary border-primary/30 whitespace-nowrap flex-shrink-0">
+                      {selectedSource.badge}
+                    </Badge>
+                    <span className="text-sm font-semibold text-foreground break-words">{selectedSource.label}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-snug break-words">{selectedSource.description}</p>
+                </div>
+                <Select value={sourceOption} onValueChange={(value) => setSourceOption(value as SourceOption)}>
+                  <SelectTrigger className="w-full sm:w-[520px] max-w-full min-h-[72px] bg-primary/5 border-primary/30 hover:border-primary/50 focus:ring-2 focus:ring-primary/40 whitespace-normal text-left items-start py-3">
+                    <div className="flex flex-col gap-1 text-left whitespace-normal leading-snug w-full pr-6">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-[10px] tracking-wide uppercase bg-primary/10 text-primary border-primary/30 whitespace-nowrap flex-shrink-0">
+                          {selectedSource.badge}
+                        </Badge>
+                        <span className="text-sm font-semibold text-foreground break-words">{selectedSource.label}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground block break-words">{selectedSource.description}</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="w-[520px] max-w-full">
+                    {SOURCE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value} className="py-3">
+                        <div className="flex flex-col space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-[10px] tracking-wide uppercase bg-primary/10 text-primary border-primary/30 whitespace-nowrap flex-shrink-0">
+                              {option.badge}
+                            </Badge>
+                            <span className="text-sm font-semibold text-foreground break-words">{option.label}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground break-words">{option.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
           <TooltipProvider>
             <div className="relative">
               <Textarea

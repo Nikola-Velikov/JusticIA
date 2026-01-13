@@ -145,8 +145,8 @@ const Index = () => {
                 <ChatArea 
                   messages={messages}
                   isLoading={isLoading}
-                  onSendMessage={sendMessage}
-                  onEditMessage={(id, content) => editLastMessage(id, content)}
+                  onSendMessage={(content, option) => sendMessage(content, option)}
+                  onEditMessage={(id, content, option) => editLastMessage(id, content, option)}
                   onStop={stopSending}
                   user={user}
                   onLogout={handleLogout}
