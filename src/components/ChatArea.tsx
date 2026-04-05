@@ -286,13 +286,13 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
                                     event.stopPropagation();
                                     openCitation(message, citationNumber);
                                   }}
-                                  className="not-prose mx-1 inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-primary/20 bg-primary/10 px-3 align-middle shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                  className="not-prose mx-0.5 inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-border/70 bg-muted/40 px-2 text-[11px] font-semibold text-foreground align-middle transition-colors hover:border-primary/20 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                   aria-label={`Отвори източник ${citationNumber}`}
                                 >
                                   <span className="hidden">
                                     Източник
                                   </span>
-                                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-2 text-xs font-bold leading-none text-primary-foreground">
+                                  <span className="inline-flex min-w-4 items-center justify-center leading-none">
                                     {children}
                                   </span>
                                 </button>
