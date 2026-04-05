@@ -80,7 +80,7 @@ function formatStandaloneCitationGroup(group: string) {
     new Set(Array.from(group.matchAll(/SOURCE\s+(\d+)/gi)).map((match) => match[1])),
   );
   if (!numbers.length) return group;
-  return numbers.map((number) => `[${number}](cite:${number})`).join(" ");
+  return numbers.map((number) => `[${number}](#cite-${number})`).join(" ");
 }
 
 function formatAssistantContent(content: string) {
@@ -88,7 +88,7 @@ function formatAssistantContent(content: string) {
     .replace(/\(((?:\s*SOURCE\s+\d+\s*(?:[,;]\s*SOURCE\s+\d+\s*)*))\)/gi, (_, group: string) =>
       formatStandaloneCitationGroup(group)
     )
-    .replace(/\bSOURCE\s+(\d+)\b/gi, (_match, number: string) => `[${number}](cite:${number})`);
+    .replace(/\bSOURCE\s+(\d+)\b/gi, (_match, number: string) => `[${number}](#cite-${number})`);
 }
 
 
@@ -276,8 +276,8 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
                       <ReactMarkdown
                         components={{
                           a: ({ href, children }) => {
-                            if (href?.startsWith("cite:")) {
-                              const citationNumber = Number(href.slice("cite:".length));
+                            if (href?.startsWith("#cite-")) {
+                              const citationNumber = Number(href.slice("#cite-".length));
                               return (
                                 <button
                                   type="button"
@@ -286,10 +286,15 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
                                     event.stopPropagation();
                                     openCitation(message, citationNumber);
                                   }}
-                                  className="not-prose mx-1 inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-primary/20 bg-primary/10 px-2.5 align-middle text-[11px] font-bold leading-none text-primary shadow-sm transition-all hover:-translate-y-0.5 hover:bg-primary hover:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                  className="not-prose mx-1 inline-flex h-8 items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 align-middle shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-primary/30"
                                   aria-label={`Отвори източник ${citationNumber}`}
                                 >
-                                  {children}
+                                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/80">
+                                    Източник
+                                  </span>
+                                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold leading-none text-primary-foreground">
+                                    {children}
+                                  </span>
                                 </button>
                               );
                             }
@@ -490,25 +495,37 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
       </div>
 
       <Dialog open={Boolean(selectedCitation)} onOpenChange={(open) => { if (!open) setSelectedCitation(null); }}>
-        <DialogContent className="max-w-3xl border-border bg-card shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+        <DialogContent className="max-w-3xl overflow-hidden border-border bg-card p-0 shadow-2xl">
+          <DialogHeader className="border-b border-border bg-muted/30 px-6 py-5 text-left">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-primary hover:bg-primary/10">
                 Източник {selectedCitation?.number}
               </Badge>
-              <span>{selectedCitation?.title}</span>
+              {selectedCitation?.article ? (
+                <Badge variant="secondary" className="rounded-full px-2.5 py-1">
+                  {selectedCitation.article}
+                </Badge>
+              ) : null}
+            </div>
+            <DialogTitle className="text-left text-lg leading-snug">
+              {selectedCitation?.title}
             </DialogTitle>
-            <DialogDescription>
-              {[selectedCitation?.index, selectedCitation?.article].filter(Boolean).join(" • ") || "Откъс от използвания правен източник"}
+            <DialogDescription className="text-left">
+              {selectedCitation?.index || "Откъс от използвания правен източник"}
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-4">
-            <div className="rounded-xl border border-border bg-muted/30 p-5">
-              <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
-                {selectedCitation?.excerpt}
+          <div className="px-6 py-5">
+            <div className="rounded-xl border border-border bg-background p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Точен откъс
               </p>
+              <ScrollArea className="mt-3 max-h-[55vh] pr-4">
+                <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
+                  {selectedCitation?.excerpt}
+                </p>
+              </ScrollArea>
             </div>
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
