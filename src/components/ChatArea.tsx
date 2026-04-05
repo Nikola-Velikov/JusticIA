@@ -7,6 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { type ChatMatchInput, type ChatSourceRef, getCitationMatchByNumber } from "@/lib/chat-citations";
 import { SourceOption } from "@/types/generator";
 import ReactMarkdown from "react-markdown";
 
@@ -16,9 +18,22 @@ interface Message {
   role: "user" | "assistant";
   timestamp: Date;
   metadata?: {
+    term?: string;
+    indices?: string[];
+    sources?: ChatSourceRef[];
+    matches?: ChatMatchInput[];
+    results_count?: number;
     options?: SourceOption;
     [key: string]: unknown;
   };
+}
+
+interface CitationPreview {
+  number: number;
+  title: string;
+  index: string;
+  article?: string;
+  excerpt: string;
 }
 
 interface ChatAreaProps {
@@ -60,6 +75,20 @@ const SOURCE_OPTIONS: Array<{ value: SourceOption; label: string; description: s
   },
 ];
 
+function formatStandaloneCitationGroup(group: string) {
+  const numbers = Array.from(group.matchAll(/SOURCE\s+(\d+)/gi)).map((match) => match[1]);
+  if (!numbers.length) return group;
+  return numbers.map((number) => `[>${number}](cite:${number})`).join(" ");
+}
+
+function formatAssistantContent(content: string) {
+  return content
+    .replace(/\(((?:\s*SOURCE\s+\d+\s*(?:[,;]\s*SOURCE\s+\d+\s*)*))\)/gi, (_, group: string) =>
+      formatStandaloneCitationGroup(group)
+    )
+    .replace(/\bSOURCE\s+(\d+)\b/gi, (_match, number: string) => `[>${number}](cite:${number})`);
+}
+
 
 export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMessage, user, onLogout, onEditingChange }: ChatAreaProps) {
   const [input, setInput] = useState("");
@@ -69,6 +98,7 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
   const typingTimer = useRef<number | null>(null);
   const [sourceOption, setSourceOption] = useState<SourceOption>("all");
   const [sourceCollapsed, setSourceCollapsed] = useState(false);
+  const [selectedCitation, setSelectedCitation] = useState<CitationPreview | null>(null);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -163,6 +193,24 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
     try { await navigator.clipboard.writeText(text); } catch {}
   };
 
+  const openCitation = (message: Message, citationNumber: number) => {
+    const match = getCitationMatchByNumber(message.metadata, citationNumber);
+    const source = {
+      title: match?.title || `Цитат ${citationNumber}`,
+      index: match?.index || "",
+      article: match?.article,
+    };
+    const excerpt = match?.content || "Няма наличен откъс за този цитат.";
+
+    setSelectedCitation({
+      number: citationNumber,
+      article: match?.article,
+      title: match?.title || `Цитат ${citationNumber}`,
+      index: match?.index || "",
+      excerpt: excerpt || "Няма наличен откъс за този цитат.",
+    });
+  };
+
   const selectedSource = SOURCE_OPTIONS.find((option) => option.value === sourceOption) || SOURCE_OPTIONS[0];
 
   return (
@@ -229,8 +277,31 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
                 <div className="text-sm leading-relaxed whitespace-pre-wrap">
                   {message.role === "assistant" ? (
                     <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap">
-                      <ReactMarkdown>
-                        {typedMap[message.id] ?? message.content}
+                      <ReactMarkdown
+                        components={{
+                          a: ({ href, children }) => {
+                            if (href?.startsWith("cite:")) {
+                              const citationNumber = Number(href.slice("cite:".length));
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => openCitation(message, citationNumber)}
+                                  className="mx-0.5 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                                >
+                                  {children}
+                                </button>
+                              );
+                            }
+
+                            return (
+                              <a href={href} target="_blank" rel="noreferrer" className="text-primary underline">
+                                {children}
+                              </a>
+                            );
+                          },
+                        }}
+                      >
+                        {formatAssistantContent(typedMap[message.id] ?? message.content)}
                       </ReactMarkdown>
                     </div>
                   ) : (
@@ -416,6 +487,29 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
           </div>
         </div>
       </div>
+
+      <Dialog open={Boolean(selectedCitation)} onOpenChange={(open) => { if (!open) setSelectedCitation(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
+                &gt;{selectedCitation?.number}
+              </Badge>
+              <span>{selectedCitation?.title || `Цитат ${selectedCitation?.number}`}</span>
+            </DialogTitle>
+            <DialogDescription>
+              {selectedCitation?.index || "Откъс от използвания правен източник"}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
+                {selectedCitation?.excerpt}
+              </p>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

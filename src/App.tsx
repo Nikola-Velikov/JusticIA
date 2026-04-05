@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import LegalSearch from "./pages/LegalSearch";
 import { ProtectedRoute, GuestRoute } from "./routes/guards";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/chat" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/search" element={<ProtectedRoute><LegalSearch /></ProtectedRoute>} />
           <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
           <Route path="/signup" element={<GuestRoute><Signup /></GuestRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

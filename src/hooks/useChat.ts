@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiDelete, apiGet, apiPost, userError } from "@/lib/api";
+import { type ChatMatchInput, type ChatSourceRef } from "@/lib/chat-citations";
 import { useToast } from "@/hooks/use-toast";
 import { SourceOption } from "@/types/generator";
 
@@ -11,8 +12,8 @@ export interface Message {
   metadata?: {
     term?: string;
     indices?: string[];
-    sources?: Array<{ index: string; title: string }>;
-    matches?: string[];
+    sources?: ChatSourceRef[];
+    matches?: ChatMatchInput[];
     results_count?: number;
     options?: SourceOption;
   };
