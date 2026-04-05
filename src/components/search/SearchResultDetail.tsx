@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
-  formatValue,
   getFullDocumentEntries,
   getMetadataEntries,
   getResultTitle,
@@ -42,6 +41,17 @@ function DetailSections({ result }: { result: SearchResult }) {
     typeof result.description === "string" && result.description.trim().length > 0
       ? result.description.trim()
       : "";
+  const seenKeys = new Set<string>();
+  const documentInfoCompact = [...metadataEntries, ...fullDocument.compact].filter((entry) => {
+    if (seenKeys.has(entry.key)) return false;
+    seenKeys.add(entry.key);
+    return true;
+  });
+  const documentInfoLongText = fullDocument.longText.filter((entry) => {
+    if (seenKeys.has(entry.key)) return false;
+    seenKeys.add(entry.key);
+    return true;
+  });
 
   return (
     <div className="space-y-6 overflow-y-auto px-1 py-1">
@@ -67,12 +77,12 @@ function DetailSections({ result }: { result: SearchResult }) {
 
       <Card className="border-border/80">
         <CardHeader>
-          <CardTitle className="text-xl">Метаданни</CardTitle>
+          <CardTitle className="text-xl">Данни за документа</CardTitle>
         </CardHeader>
-        <CardContent>
-          {metadataEntries.length > 0 ? (
+        <CardContent className="space-y-4">
+          {documentInfoCompact.length > 0 && (
             <div className="grid gap-3 md:grid-cols-2">
-              {metadataEntries.map((entry) => (
+              {documentInfoCompact.map((entry) => (
                 <div key={entry.key} className="rounded-lg border border-border/80 bg-background p-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {entry.label}
@@ -81,8 +91,25 @@ function DetailSections({ result }: { result: SearchResult }) {
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Няма налични метаданни.</p>
+          )}
+
+          {documentInfoLongText.length > 0 && (
+            <div className="space-y-3">
+              {documentInfoLongText.map((entry) => (
+                <div key={entry.key} className="rounded-lg border border-border/80 bg-muted/30 p-4">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {entry.label}
+                  </p>
+                  <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
+                    {entry.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {documentInfoCompact.length === 0 && documentInfoLongText.length === 0 && (
+            <p className="text-sm text-muted-foreground">Няма налични данни за документа.</p>
           )}
         </CardContent>
       </Card>
@@ -97,45 +124,6 @@ function DetailSections({ result }: { result: SearchResult }) {
               {description || "Няма налично описание за този резултат."}
             </p>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/80">
-        <CardHeader>
-          <CardTitle className="text-xl">Пълен документ</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {fullDocument.compact.length > 0 && (
-            <div className="grid gap-3 md:grid-cols-2">
-              {fullDocument.compact.map((entry) => (
-                <div key={entry.key} className="rounded-lg border border-border/80 bg-background p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {entry.label}
-                  </p>
-                  <p className="mt-1 text-sm text-foreground">{entry.value}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {fullDocument.longText.length > 0 && (
-            <div className="space-y-3">
-              {fullDocument.longText.map((entry) => (
-                <div key={entry.key} className="rounded-lg border border-border/80 bg-muted/30 p-4">
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {entry.label}
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
-                    {entry.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {fullDocument.compact.length === 0 && fullDocument.longText.length === 0 && (
-            <p className="text-sm text-muted-foreground">Няма допълнителни данни за документа.</p>
-          )}
         </CardContent>
       </Card>
     </div>

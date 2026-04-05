@@ -250,6 +250,7 @@ const NUMERIC_BG_FILTER_KEYS: BgFilterKey[] = [
 
 const OMIT_FULL_DOCUMENT_KEYS = new Set([
   "_id",
+  "gid",
   "description",
   "embedding",
   "field",
@@ -394,7 +395,14 @@ export function getDescriptionPreview(description: string | null | undefined, le
 
 export function getMetadataEntries(metadata: Record<string, unknown>) {
   return Object.entries(metadata)
-    .filter(([key, value]) => key !== "source" && key !== "field" && isDisplayableValue(value))
+    .filter(
+      ([key, value]) =>
+        key !== "source" &&
+        key !== "field" &&
+        key !== "_id" &&
+        key !== "gid" &&
+        isDisplayableValue(value),
+    )
     .map(([key, value]) => ({
       key,
       label: getFieldLabel(key),
