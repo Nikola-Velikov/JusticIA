@@ -286,7 +286,7 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
                                     event.stopPropagation();
                                     openCitation(message, citationNumber);
                                   }}
-                                  className="not-prose mx-0.5 inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-border/70 bg-muted/40 px-2 text-[11px] font-semibold text-foreground align-middle transition-colors hover:border-primary/20 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                  className="not-prose mx-0.5 inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-primary/25 bg-primary/10 px-2 text-[11px] font-semibold text-primary align-middle shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-colors hover:border-primary/35 hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                   aria-label={`Отвори източник ${citationNumber}`}
                                 >
                                   <span className="hidden">
