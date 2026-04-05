@@ -76,9 +76,11 @@ const SOURCE_OPTIONS: Array<{ value: SourceOption; label: string; description: s
 ];
 
 function formatStandaloneCitationGroup(group: string) {
-  const numbers = Array.from(group.matchAll(/SOURCE\s+(\d+)/gi)).map((match) => match[1]);
+  const numbers = Array.from(
+    new Set(Array.from(group.matchAll(/SOURCE\s+(\d+)/gi)).map((match) => match[1])),
+  );
   if (!numbers.length) return group;
-  return numbers.map((number) => `[>${number}](cite:${number})`).join(" ");
+  return numbers.map((number) => `[${number}](cite:${number})`).join(" ");
 }
 
 function formatAssistantContent(content: string) {
@@ -86,7 +88,7 @@ function formatAssistantContent(content: string) {
     .replace(/\(((?:\s*SOURCE\s+\d+\s*(?:[,;]\s*SOURCE\s+\d+\s*)*))\)/gi, (_, group: string) =>
       formatStandaloneCitationGroup(group)
     )
-    .replace(/\bSOURCE\s+(\d+)\b/gi, (_match, number: string) => `[>${number}](cite:${number})`);
+    .replace(/\bSOURCE\s+(\d+)\b/gi, (_match, number: string) => `[${number}](cite:${number})`);
 }
 
 
@@ -195,19 +197,13 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
 
   const openCitation = (message: Message, citationNumber: number) => {
     const match = getCitationMatchByNumber(message.metadata, citationNumber);
-    const source = {
-      title: match?.title || `Цитат ${citationNumber}`,
-      index: match?.index || "",
-      article: match?.article,
-    };
-    const excerpt = match?.content || "Няма наличен откъс за този цитат.";
 
     setSelectedCitation({
       number: citationNumber,
-      article: match?.article,
-      title: match?.title || `Цитат ${citationNumber}`,
+      title: match?.title || `Източник ${citationNumber}`,
       index: match?.index || "",
-      excerpt: excerpt || "Няма наличен откъс за този цитат.",
+      article: match?.article,
+      excerpt: match?.content || "Няма наличен откъс за този цитат.",
     });
   };
 
@@ -285,8 +281,13 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
                               return (
                                 <button
                                   type="button"
-                                  onClick={() => openCitation(message, citationNumber)}
-                                  className="mx-0.5 inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    openCitation(message, citationNumber);
+                                  }}
+                                  className="not-prose mx-1 inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-primary/20 bg-primary/10 px-2.5 align-middle text-[11px] font-bold leading-none text-primary shadow-sm transition-all hover:-translate-y-0.5 hover:bg-primary hover:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                  aria-label={`Отвори източник ${citationNumber}`}
                                 >
                                   {children}
                                 </button>
@@ -489,20 +490,20 @@ export function ChatArea({ messages, isLoading, onSendMessage, onStop, onEditMes
       </div>
 
       <Dialog open={Boolean(selectedCitation)} onOpenChange={(open) => { if (!open) setSelectedCitation(null); }}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl border-border bg-card shadow-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
-                &gt;{selectedCitation?.number}
+              <Badge className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-primary hover:bg-primary/10">
+                Източник {selectedCitation?.number}
               </Badge>
-              <span>{selectedCitation?.title || `Цитат ${selectedCitation?.number}`}</span>
+              <span>{selectedCitation?.title}</span>
             </DialogTitle>
             <DialogDescription>
-              {selectedCitation?.index || "Откъс от използвания правен източник"}
+              {[selectedCitation?.index, selectedCitation?.article].filter(Boolean).join(" • ") || "Откъс от използвания правен източник"}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-4">
-            <div className="rounded-lg border border-border bg-muted/30 p-4">
+            <div className="rounded-xl border border-border bg-muted/30 p-5">
               <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
                 {selectedCitation?.excerpt}
               </p>
